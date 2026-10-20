@@ -3,27 +3,32 @@
 from __future__ import annotations
 
 from datetime import datetime
+from html import escape
 from typing import Any
 
-import pandas as pd
 import streamlit as st
 
 from db import DatabaseConfigurationError, connection
 
 
 st.set_page_config(
-    page_title="Cloud Resource Cost Analyzer",
+    page_title="CloudLedger",
     page_icon="☁️",
     layout="wide",
 )
 
 
-def query_dataframe(sql: str, parameters: dict[str, Any] | None = None) -> pd.DataFrame:
+def query_records(
+    sql: str, parameters: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     with connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(sql, parameters or {})
             columns = [column[0].lower() for column in cursor.description]
-            return pd.DataFrame(cursor.fetchall(), columns=columns)
+            return [
+                dict(zip(columns, row, strict=True))
+                for row in cursor.fetchall()
+            ]
 
 
 def query_value(sql: str, parameters: dict[str, Any] | None = None) -> Any:
@@ -32,6 +37,22 @@ def query_value(sql: str, parameters: dict[str, Any] | None = None) -> Any:
             cursor.execute(sql, parameters or {})
             row = cursor.fetchone()
             return None if row is None else row[0]
+
+
+def render_records(records: list[dict[str, Any]]) -> None:
+    """Render database records without Streamlit's Pandas-backed table widgets."""
+
+    if not records:
+        st.info("No records found.")
+        return
+    columns = list(records[0])
+    header = "| " + " | ".join(columns) + " |"
+    separator = "| " + " | ".join("---" for _ in columns) + " |"
+    rows = [
+        "| " + " | ".join(escape(str(record.get(column, ""))) for column in columns) + " |"
+        for record in records
+    ]
+    st.markdown("\n".join([header, separator, *rows]))
 
 
 def run_procedure(
@@ -67,10 +88,11 @@ def render_dashboard() -> None:
         current_time = query_value(
             "select pkg_demo_clock.current_simulated_time from dual"
         )
+        local_time = query_value("select current_timestamp from dual")
         cycle_cost = query_value(
             "select pkg_billing.current_cycle_cost from dual"
         ) or 0
-        resources = query_dataframe(
+        resources = query_records(
             """
             select resource_name, resource_type, status, hourly_rate,
                    fn_resource_cost(resource_id) as current_cost
@@ -78,21 +100,21 @@ def render_dashboard() -> None:
             order by resource_name
             """
         )
-        budget = query_dataframe(
+        budget = query_records(
             """
             select budget_amount, cycle_type, warning_threshold_pct, currency_code
             from budget_settings
             where budget_id = 1
             """
         )
-        clock = query_dataframe(
+        clock = query_records(
             """
             select speed_multiplier, is_paused
             from demo_clock
             where clock_id = 1
             """
         )
-        alerts = query_dataframe(
+        alerts = query_records(
             """
             select alert_type, amount, threshold_pct, created_at
             from budget_alerts
@@ -104,38 +126,53 @@ def render_dashboard() -> None:
         render_connection_error(exc)
         return
 
-    budget_amount = float(budget.iloc[0]["budget_amount"]) if not budget.empty else 0
+    budget_amount = float(budget[0]["budget_amount"]) if budget else 0
     consumed_pct = (float(cycle_cost) / budget_amount * 100) if budget_amount else 0
-    running_count = int((resources["status"] == "RUNNING").sum()) if not resources.empty else 0
+    running_count = sum(1 for row in resources if row["status"] == "RUNNING")
 
-    metrics = st.columns(4)
+    if isinstance(current_time, datetime):
+        formatted_time = current_time.strftime("%d %b %Y, %H:%M:%S")
+    else:
+        formatted_time = str(current_time)
+    if isinstance(local_time, datetime):
+        formatted_local_time = local_time.strftime("%d %b %Y, %H:%M:%S")
+    else:
+        formatted_local_time = str(local_time)
+
+    metrics = st.columns(3)
     metrics[0].metric("Current-cycle cost", f"₹{float(cycle_cost):,.2f}")
-    metrics[1].metric("Budget consumed", f"{consumed_pct:.1f}%")
+    metrics[1].metric("Budget consumed", f"{consumed_pct:.2f}%")
     metrics[2].metric("Running resources", running_count)
-    metrics[3].metric("Simulated time", str(current_time))
+    st.info(
+        f"Local time: **{formatted_local_time}**  \n"
+        f"Simulated time: **{formatted_time}** "
+        f"({clock[0]['speed_multiplier'] if clock else 1}× clock)"
+    )
 
-    if not budget.empty:
+    if budget:
         st.caption(
-            f"Budget: ₹{budget_amount:,.2f} · {budget.iloc[0]['cycle_type']} cycle · "
-            f"Warning at {budget.iloc[0]['warning_threshold_pct']}%"
+            f"Budget: ₹{budget_amount:,.2f} · {budget[0]['cycle_type']} cycle · "
+            f"Consumed: ₹{float(cycle_cost):,.2f} · "
+            f"Remaining: ₹{max(budget_amount - float(cycle_cost), 0):,.2f} · "
+            f"Warning at {budget[0]['warning_threshold_pct']}%"
         )
-    if not clock.empty:
-        state = "Paused" if clock.iloc[0]["is_paused"] == "Y" else "Running"
-        st.caption(f"Clock: {state} at {clock.iloc[0]['speed_multiplier']}×")
+    if clock:
+        state = "Paused" if clock[0]["is_paused"] == "Y" else "Running"
+        st.caption(f"Clock: {state} at {clock[0]['speed_multiplier']}×")
 
     st.subheader("Resources")
-    st.dataframe(resources, use_container_width=True, hide_index=True)
+    render_records(resources)
     st.subheader("Recent alerts")
-    if alerts.empty:
+    if not alerts:
         st.info("No budget alerts have been recorded.")
     else:
-        st.dataframe(alerts, use_container_width=True, hide_index=True)
+        render_records(alerts)
 
 
 def render_resources() -> None:
     st.subheader("Resource management")
     try:
-        resources = query_dataframe(
+        resources = query_records(
             """
             select resource_id, resource_name, resource_type, hourly_rate,
                    status, description, fn_resource_cost(resource_id) as current_cost
@@ -147,13 +184,13 @@ def render_resources() -> None:
         render_connection_error(exc)
         return
 
-    st.dataframe(resources, use_container_width=True, hide_index=True)
+    render_records(resources)
     resource_map = {
-        f"{row.resource_name} ({row.resource_id})": int(row.resource_id)
-        for row in resources.itertuples()
+        f"{row['resource_name']} ({row['resource_id']})": int(row["resource_id"])
+        for row in resources
     }
 
-    with st.expander("Create resource", expanded=resources.empty):
+    with st.expander("Create resource", expanded=not resources):
         with st.form("create_resource"):
             name = st.text_input("Name")
             resource_type = st.selectbox("Type", ["VM", "STORAGE", "COMPUTE"])
@@ -180,7 +217,7 @@ def render_resources() -> None:
 
     selected_label = st.selectbox("Select resource", list(resource_map))
     selected_id = resource_map[selected_label]
-    selected = resources.loc[resources["resource_id"] == selected_id].iloc[0]
+    selected = next(row for row in resources if row["resource_id"] == selected_id)
     action_columns = st.columns(3)
     if selected["status"] == "STOPPED":
         if action_columns[0].button("Start resource", key=f"start_{selected_id}"):
@@ -242,21 +279,21 @@ def render_resources() -> None:
 def render_settings() -> None:
     st.subheader("Clock and budget settings")
     try:
-        settings = query_dataframe(
+        settings = query_records(
             """
             select budget_amount, cycle_type, warning_threshold_pct, currency_code
             from budget_settings
             where budget_id = 1
             """
         )
-        clock = query_dataframe(
+        clock = query_records(
             "select speed_multiplier, is_paused from demo_clock where clock_id = 1"
         )
     except Exception as exc:
         render_connection_error(exc)
         return
 
-    if settings.empty or clock.empty:
+    if not settings or not clock:
         st.error("Stage 2 settings are missing. Run sql\\01_tables.sql first.")
         return
 
@@ -264,7 +301,7 @@ def render_settings() -> None:
     speed = st.number_input(
         "Speed multiplier",
         min_value=0.01,
-        value=float(clock.iloc[0]["speed_multiplier"]),
+        value=float(clock[0]["speed_multiplier"]),
         step=1.0,
     )
     clock_columns = st.columns(4)
@@ -275,7 +312,7 @@ def render_settings() -> None:
             st.rerun()
         except Exception as exc:
             render_connection_error(exc)
-    if clock.iloc[0]["is_paused"] == "Y":
+    if clock[0]["is_paused"] == "Y":
         if clock_columns[1].button("Resume clock"):
             try:
                 run_procedure("pkg_demo_clock", "resume_clock")
@@ -297,7 +334,7 @@ def render_settings() -> None:
             render_connection_error(exc)
 
     st.markdown("#### Budget")
-    current = settings.iloc[0]
+    current = settings[0]
     with st.form("budget_settings"):
         amount = st.number_input(
             "Budget amount", min_value=0.01, value=float(current["budget_amount"])
@@ -335,8 +372,8 @@ def render_settings() -> None:
             render_connection_error(exc)
 
 
-st.title("Cloud Resource Cost Analyzer")
-st.caption("Oracle-backed billing simulator for cloud resources.")
+st.title("CloudLedger")
+st.caption("Cloud Resource Cost Analyzer · Oracle-backed billing simulator for cloud resources.")
 
 try:
     with connection() as conn:

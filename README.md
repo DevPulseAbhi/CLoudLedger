@@ -1,4 +1,7 @@
-# Cloud Resource Cost Analyzer
+# CloudLedger
+
+Cloud Resource Cost Analyzer — an Oracle-backed billing simulator for cloud
+resources.
 
 An MCA Semester 1 minor project using Oracle Database and PL/SQL for persistence
 and billing logic, with a Python/Streamlit dashboard.
@@ -30,6 +33,11 @@ and alert evaluation. It does not use hardcoded dashboard metrics.
 
 The application uses `python-oracledb` Thin mode by default, so an Oracle
 Instant Client is not required for the initial setup.
+
+The current Stage 2 dashboard passes Oracle result records directly to
+Streamlit and does not import Pandas at startup. This keeps the dashboard
+usable on Windows machines whose Application Control policy blocks native
+NumPy DLLs. Pandas and Plotly remain declared for the planned analytics stage.
 
 ## Local setup
 
@@ -68,6 +76,13 @@ scripts must be installed before the tabs can load their records.
 - **Thick mode errors**: keep `ORACLE_THICK_MODE=false` unless Thick mode is
   needed. If enabled, set `ORACLE_CLIENT_LIB_DIR` to the Oracle Client library
   directory.
+- **`ImportError: DLL load failed ... _mt19937`**: this is a Windows
+  Application Control policy blocking NumPy's native DLL, not an Oracle or
+  application-code error. The Stage 2 dashboard does not require Pandas, so
+  start it with the documented command after pulling the current source. Do
+  not disable or bypass the security policy. If later analytics require
+  Pandas, ask the system administrator to approve the signed/trusted Python
+  environment or install an organization-approved wheel.
 
 ## Run Stage 2 in SQL Developer
 
