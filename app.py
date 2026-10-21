@@ -17,6 +17,139 @@ st.set_page_config(
     layout="wide",
 )
 
+st.markdown(
+    """
+    <style>
+    :root {
+        --cloud-bg: #eef2f7;
+        --cloud-surface: #eef2f7;
+        --cloud-ink: #243247;
+        --cloud-muted: #66758a;
+        --cloud-accent: #4776a8;
+        --cloud-shadow-dark: #cbd2dc;
+        --cloud-shadow-light: #ffffff;
+    }
+
+    .stApp {
+        background: var(--cloud-bg);
+        color: var(--cloud-ink);
+    }
+
+    [data-testid="stHeader"] {
+        background: transparent;
+    }
+
+    [data-testid="stSidebar"] {
+        background: var(--cloud-bg);
+    }
+
+    h1, h2, h3, p, label, [data-testid="stCaptionContainer"] {
+        color: var(--cloud-ink);
+    }
+
+    [data-testid="stMetric"] {
+        background: var(--cloud-surface);
+        border: 0;
+        border-radius: 18px;
+        padding: 1rem 1.1rem;
+        box-shadow: 7px 7px 14px var(--cloud-shadow-dark),
+                    -7px -7px 14px var(--cloud-shadow-light);
+    }
+
+    [data-testid="stMetricLabel"],
+    [data-testid="stMetricValue"] {
+        color: var(--cloud-ink);
+    }
+
+    div[data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        background: var(--cloud-bg);
+        padding: 0.35rem;
+        border-radius: 16px;
+        box-shadow: inset 3px 3px 7px var(--cloud-shadow-dark),
+                    inset -3px -3px 7px var(--cloud-shadow-light);
+    }
+
+    button[data-baseweb="tab"] {
+        border-radius: 12px;
+        color: var(--cloud-muted);
+    }
+
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: var(--cloud-accent);
+        background: var(--cloud-surface);
+        box-shadow: 3px 3px 7px var(--cloud-shadow-dark),
+                    -3px -3px 7px var(--cloud-shadow-light);
+    }
+
+    .stButton > button,
+    .stFormSubmitButton > button {
+        border: 0;
+        border-radius: 12px;
+        color: var(--cloud-ink);
+        background: var(--cloud-surface);
+        box-shadow: 5px 5px 10px var(--cloud-shadow-dark),
+                    -5px -5px 10px var(--cloud-shadow-light);
+        transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+
+    .stButton > button:hover,
+    .stFormSubmitButton > button:hover {
+        color: var(--cloud-accent);
+        transform: translateY(-1px);
+    }
+
+    .stButton > button:active,
+    .stFormSubmitButton > button:active {
+        box-shadow: inset 3px 3px 7px var(--cloud-shadow-dark),
+                    inset -3px -3px 7px var(--cloud-shadow-light);
+        transform: translateY(0);
+    }
+
+    div[data-baseweb="input"],
+    div[data-baseweb="select"] > div,
+    textarea {
+        border: 0;
+        border-radius: 12px;
+        background: var(--cloud-surface);
+        box-shadow: inset 3px 3px 7px var(--cloud-shadow-dark),
+                    inset -3px -3px 7px var(--cloud-shadow-light);
+    }
+
+    [data-testid="stExpander"],
+    [data-testid="stAlert"] {
+        border: 0;
+        border-radius: 16px;
+        background: var(--cloud-surface);
+        box-shadow: 5px 5px 10px var(--cloud-shadow-dark),
+                    -5px -5px 10px var(--cloud-shadow-light);
+    }
+
+    [data-testid="stMarkdownContainer"] table {
+        border-collapse: separate;
+        border-spacing: 0;
+        overflow: hidden;
+        border-radius: 14px;
+        background: var(--cloud-surface);
+        box-shadow: 5px 5px 10px var(--cloud-shadow-dark),
+                    -5px -5px 10px var(--cloud-shadow-light);
+    }
+
+    [data-testid="stMarkdownContainer"] th,
+    [data-testid="stMarkdownContainer"] td {
+        border: 0;
+        color: var(--cloud-ink);
+    }
+
+    [data-testid="stMarkdownContainer"] th {
+        color: var(--cloud-accent);
+        background: rgba(255, 255, 255, 0.28);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 def query_records(
     sql: str, parameters: dict[str, Any] | None = None
