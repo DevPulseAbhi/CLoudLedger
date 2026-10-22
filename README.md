@@ -57,8 +57,17 @@ local Oracle configuration.
 
 ## Run the application
 
+In PowerShell, first move to the project directory:
+
 ```powershell
+Set-Location "E:\SQL Mini Project"
 & .\.venv\Scripts\streamlit.exe run app.py
+```
+
+If the terminal is in another directory, use the absolute-path command:
+
+```powershell
+& "E:\SQL Mini Project\.venv\Scripts\streamlit.exe" run "E:\SQL Mini Project\app.py"
 ```
 
 Open the displayed local URL. The application first checks Oracle using
@@ -73,6 +82,22 @@ scripts must be installed before the tabs can load their records.
 
 - **Unable to connect**: check that the Oracle listener and database are
   running, confirm the service name, and test the same DSN with SQL*Plus.
+- **`streamlit` or `.venv` is not recognized**: the command is being run from
+  the wrong directory or the virtual environment has not been created. Run
+  the setup commands from the project directory, or use the absolute-path
+  command above. Confirm the executable exists with:
+
+  ```powershell
+  Test-Path "E:\SQL Mini Project\.venv\Scripts\streamlit.exe"
+  ```
+
+- **Port already in use**: start on another port:
+
+  ```powershell
+  & "E:\SQL Mini Project\.venv\Scripts\streamlit.exe" run `
+      "E:\SQL Mini Project\app.py" --server.port 8502
+  ```
+
 - **Thick mode errors**: keep `ORACLE_THICK_MODE=false` unless Thick mode is
   needed. If enabled, set `ORACLE_CLIENT_LIB_DIR` to the Oracle Client library
   directory.
