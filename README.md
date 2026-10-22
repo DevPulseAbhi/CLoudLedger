@@ -39,6 +39,15 @@ Streamlit and does not import Pandas at startup. This keeps the dashboard
 usable on Windows machines whose Application Control policy blocks native
 NumPy DLLs. Pandas and Plotly remain declared for the planned analytics stage.
 
+When current-cycle expenditure reaches 100% of the configured budget, the
+database enforcement procedure records one `EXCEEDED` alert for that cycle.
+Resource enforcement is evaluated individually: only a running resource whose
+own current-cycle cost reaches 100% of the configured limit is stopped. Other
+resources continue running until their own costs reach the limit. The
+dashboard invokes this check before loading its metrics, so a refresh cannot
+continue billing a resource past its enforced stop point. Historical usage
+sessions and billing records are preserved.
+
 ## Local setup
 
 From `e:\SQL Mini Project` in PowerShell:
@@ -193,6 +202,10 @@ If `05_verify.sql` reports missing tables, rerun `01_tables.sql` in the same
 `04_triggers.sql` in that order. Start Streamlit only after every required
 table is `PRESENT`, every required object is `VALID`, and
 `PACKAGE_RUNTIME_CHECK=PASS` is displayed.
+
+If the database packages were installed before budget enforcement was added,
+rerun `02_packages.sql` in the same connection. This recompiles the package
+without dropping tables or deleting usage history.
 
 ## Next stage
 

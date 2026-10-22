@@ -218,6 +218,7 @@ def render_connection_error(exc: Exception) -> None:
 def render_dashboard() -> None:
     st.subheader("Dashboard")
     try:
+        run_procedure("pkg_budgets", "enforce_budget")
         current_time = query_value(
             "select pkg_demo_clock.current_simulated_time from dual"
         )
@@ -499,8 +500,8 @@ def render_settings() -> None:
 
     if st.button("Evaluate budget alerts"):
         try:
-            run_procedure("pkg_budgets", "evaluate_alerts")
-            st.success("Budget alerts evaluated from current Oracle records.")
+            run_procedure("pkg_budgets", "enforce_budget")
+            st.success("Budget alerts evaluated and budget enforcement applied.")
         except Exception as exc:
             render_connection_error(exc)
 

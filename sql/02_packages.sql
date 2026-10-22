@@ -361,6 +361,7 @@ create or replace package pkg_budgets as
         p_currency_code         in varchar2 default 'INR'
     );
     procedure evaluate_alerts;
+    procedure enforce_budget;
 end pkg_budgets;
 /
 
@@ -431,5 +432,64 @@ create or replace package body pkg_budgets as
         when no_data_found then
             raise_application_error(-20031, 'Budget settings are not initialized.');
     end evaluate_alerts;
+
+    procedure enforce_budget is
+        l_now timestamp := pkg_demo_clock.current_simulated_time;
+        l_cycle_start timestamp;
+        l_cycle_end timestamp;
+        l_budget budget_settings.budget_amount%type;
+        l_cost number;
+        l_alert_exists number;
+    begin
+        select budget_amount
+          into l_budget
+          from budget_settings
+         where budget_id = 1;
+
+        pkg_billing.get_cycle_bounds(l_now, l_cycle_start, l_cycle_end);
+        l_cost := pkg_billing.current_cycle_cost;
+
+        if l_cost < l_budget then
+            evaluate_alerts;
+            return;
+        end if;
+
+        select count(*)
+          into l_alert_exists
+          from budget_alerts
+         where cycle_type = (
+                   select cycle_type from budget_settings where budget_id = 1
+               )
+           and cycle_start = l_cycle_start
+           and alert_type = 'EXCEEDED'
+           and threshold_pct = 100;
+
+        if l_alert_exists = 0 then
+            insert into budget_alerts (
+                alert_id, cycle_type, cycle_start, threshold_pct, alert_type,
+                amount, budget_amount
+            )
+            select budget_alert_seq.nextval, cycle_type, l_cycle_start, 100,
+                   'EXCEEDED', l_cost, l_budget
+              from budget_settings
+             where budget_id = 1;
+        end if;
+
+        for resource_row in (
+            select resource_id
+              from cloud_resources
+             where status = 'RUNNING'
+        ) loop
+            if pkg_billing.resource_cost(
+                   resource_row.resource_id, l_cycle_start, least(l_now, l_cycle_end)
+               ) >= l_budget then
+                pkg_cloud_resources.stop_resource(resource_row.resource_id);
+            end if;
+        end loop;
+        commit;
+    exception
+        when no_data_found then
+            raise_application_error(-20032, 'Budget settings are not initialized.');
+    end enforce_budget;
 end pkg_budgets;
 /
